@@ -6,13 +6,9 @@ import random
 import string
 
 # --- ১. কনফিগারেশন ---
-BOT_TOKEN = '8662472994:AAFFFRZcUlbjkw7AGLMhGs7bkb4VV5Zln_s'
+BOT_TOKEN = '8743917242:AAG1Ev3j1325D8ZiwhLNOcaKj0Xk1x6hYlI'
 ADMIN_ID = 7585875519 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
-
-# ==================== বাধ্যতামূলক চ্যানেল + গ্রুপ ====================
-CHANNEL_USERNAME = '@PremiumIncomeChannel_BD'   # চ্যানেল
-GROUP_USERNAME   = '@PremiumSupport_BD'         # গ্রুপ
 
 # --- Persistent Database Connection ---
 DB_FILE = 'premium_investment_final.db'
@@ -20,13 +16,14 @@ conn = sqlite3.connect(DB_FILE, check_same_thread=False)
 cursor = conn.cursor()
 
 def db_query(query, params=(), fetch=False):
-    conn = sqlite3.connect('premium_investment_final.db')
-    cursor = conn.cursor()
-    cursor.execute(query, params)
-    data = cursor.fetchall() if fetch else None
-    conn.commit()
-    conn.close()
-    return data
+    try:
+        cursor.execute(query, params)
+        data = cursor.fetchall() if fetch else None
+        conn.commit()
+        return data
+    except Exception as e:
+        print(f"DB Error: {e}")
+        return None
 
 def init_db():
     db_query(""" CREATE TABLE IF NOT EXISTS users (
@@ -36,23 +33,18 @@ def init_db():
     
     db_query(""" CREATE TABLE IF NOT EXISTS investments (
         id INTEGER PRIMARY KEY AUTOINCREMENT, uid INTEGER, plan_id INTEGER, 
-        start_date TEXT, daily_profit REAL, last_claim TEXT DEFAULT '') """)
+        start_date TEXT, end_date TEXT, daily_profit REAL, last_claim TEXT DEFAULT '') """)
     
-    # লেনদেন হিস্টরির জন্য নতুন টেবিল
     db_query(""" CREATE TABLE IF NOT EXISTS history (
         id INTEGER PRIMARY KEY AUTOINCREMENT, uid INTEGER, type TEXT, 
         amount REAL, info TEXT, date TEXT) """)
 
-init_db()
-
-# ==================== জয়েন চেক ====================
-def is_subscribed(uid):
     try:
-        ch = bot.get_chat_member(CHANNEL_USERNAME, uid).status
-        gr = bot.get_chat_member(GROUP_USERNAME, uid).status
-        return ch in ['member', 'administrator', 'creator'] and gr in ['member', 'administrator', 'creator']
+        db_query("ALTER TABLE investments ADD COLUMN end_date TEXT")
     except:
-        return False
+        pass
+
+init_db()
 
 # ==================== ১৫ মিনিট রোটেশন ====================
 def get_current_number(method):
@@ -113,7 +105,7 @@ def get_user_bonus_amount(uid):
     res = db_query("SELECT plan_id FROM investments WHERE uid=? ORDER BY plan_id DESC LIMIT 1", (uid,), fetch=True)
     return PLANS[res[0][0]]['bonus'] if res else 0
 
-# --- ফেক লিডারবোর্ড ---
+# --- ফেক লিডারবোর্ড (শুধু User ID + প্রতিবার বাড়বে) ---
 fake_user_ids = [987654321, 1122334455, 5566778899, 2233445566, 7788990011, 3344556677, 8899001122, 4455667788, 6677889900, 9900112233]
 fake_ref_counts = [2450, 1890, 1675, 1430, 1320, 1285, 1150, 1090, 1055, 1020]
 
@@ -134,28 +126,8 @@ def start(message):
             ref_check = db_query("SELECT uid FROM users WHERE ref_code=?", (possible_ref,), fetch=True)
             if ref_check:
                 ref_by_uid = ref_check[0][0]
-        db_query("INSERT INTO users (uid, ref_code, referred_by, subscribed) VALUES (?, ?, ?, 0)", (uid, ref_code, ref_by_uid))
+        db_query("INSERT INTO users (uid, ref_code, referred_by) VALUES (?, ?, ?)", (uid, ref_code, ref_by_uid))
     
-    # চেক করি আগে জয়েন করেছে কি না
-    sub_res = db_query("SELECT subscribed FROM users WHERE uid=?", (uid,), fetch=True)
-    subscribed = sub_res[0][0] if sub_res else 0
-
-    if subscribed == 0:
-        markup = types.InlineKeyboardMarkup(row_width=1)
-        markup.add(types.InlineKeyboardButton("📢 চ্যানেলে জয়েন করুন", url=f"https://t.me/PremiumIncomeChannel_BD"))
-        markup.add(types.InlineKeyboardButton("👥 গ্রুপে জয়েন করুন", url=f"https://t.me/PremiumSupport_BD"))
-        markup.add(types.InlineKeyboardButton("✅ চেক করুন", callback_data="check_join"))
-        
-        force_msg = """🔒 <b>বট ব্যবহার করতে প্রথমে জয়েন করুন</b>
-
-📢 চ্যানেলে জয়েন করুন
-👥 গ্রুপে জয়েন করুন
-
-জয়েন হয়ে গেলে নিচে "✅ চেক করুন" বাটনে চাপুন"""
-        bot.send_message(uid, force_msg, reply_markup=markup)
-        return
-    
-    # স্বাভাবিক ওয়েলকাম
     welcome_txt = """🔥 <b>স্বাগতম PREMIUM INCOME BD-তে!</b> 🔥
 ━━━━━━━━━━━━━━━━━━━━
 আপনার স্বপ্নকে সত্যি করতে এবং ঘরে বসে নিরাপদ আয়ের নিশ্চয়তা নিয়ে আমরা এসেছি আপনার পাশে।
@@ -331,7 +303,7 @@ def handle_msg(message):
         bot.send_message(uid, history_msg, reply_markup=markup)
 
     elif "💬 সাপোর্ট ও সাহায্য" in txt:
-        markup = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("👨‍💻 Admin Support", url="https://t.me/PremiumSupport_BD"))
+        markup = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("👨‍💻 Admin Support", url="https://t.me/PremiumSupport_26"))
         bot.send_message(uid, "🎧 কোনো সমস্যা বা পেমেন্ট সংক্রান্ত সাহায্যের জন্য নিচের বাটনে ক্লিক করে এডমিনের সাথে যোগাযোগ করুন।", reply_markup=markup)
 
     elif "⚙️ কন্ট্রোলার প্যানেল" in txt and uid == ADMIN_ID:
@@ -475,32 +447,11 @@ def process_withdraw_details(message, method, amt):
 ✅ Confirm চাপলে এডমিনের কাছে পাঠানো হবে"""
     bot.send_message(uid, summary, reply_markup=markup)
 
-# --- Callback Handler ---
+# --- Callback Handler (পুরোপুরি) ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_logic(call):
     data = call.data
     uid = call.message.chat.id
-
-    if data == "check_join":
-        if is_subscribed(uid):
-            db_query("UPDATE users SET subscribed = 1 WHERE uid = ?", (uid,))
-            bot.answer_callback_query(call.id, "✅ সফলভাবে জয়েন ভেরিফাই হয়েছে!", show_alert=True)
-            
-            welcome_txt = """🔥 <b>স্বাগতম PREMIUM INCOME BD-তে!</b> 🔥
-━━━━━━━━━━━━━━━━━━━━
-আপনার স্বপ্নকে সত্যি করতে এবং ঘরে বসে নিরাপদ আয়ের নিশ্চয়তা নিয়ে আমরা এসেছি আপনার পাশে।
-
-✨ <b>আমাদের বিশেষত্ব:</b> ✨
-✅ <b>সহজ বিনিয়োগ:</b> মাত্র ৮০০ টাকা থেকে শুরু।
-✅ <b>নিশ্চিত আয়:</b> প্রতিদিন আপনার একাউন্টে লাভ যোগ হবে।
-✅ <b>দ্রুত পেমেন্ট:</b> মাত্র ৮ ঘণ্টার মধ্যে উইথড্র সফল।
-✅ <b>রেফার বোনাস:</b> বন্ধুদের ইনভাইট করলেই পাচ্ছেন আকর্ষণীয় বোনাস।
-
-আমাদের সাথে আপনার যাত্রা হোক লাভজনক ও আনন্দময়!"""
-            bot.send_message(uid, welcome_txt, reply_markup=main_menu(uid))
-        else:
-            bot.answer_callback_query(call.id, "❌ এখনো চ্যানেল বা গ্রুপে জয়েন করেননি। দয়া করে জয়েন করে আবার চেক করুন!", show_alert=True)
-        return
 
     if data == "get_ref_code":
         has_package = bool(db_query("SELECT id FROM investments WHERE uid=?", (uid,), fetch=True))
@@ -706,5 +657,5 @@ USER_ID amount
 7585875519 500""")
 
 # --- শেষ ---
-print("--- Premium Investment Bot (Force Join Channel + Group) is Online! ---")
+print("--- Premium Investment Bot (Full Complete + Live User ID Leaderboard) is Online! ---")
 bot.infinity_polling()
