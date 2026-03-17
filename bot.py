@@ -656,6 +656,8 @@ USER_ID amount
 উদাহরণ:
 7585875519 500""")
 
-# --- শেষ ---
-print("--- Premium Investment Bot (Full Complete + Live User ID Leaderboard) is Online! ---")
-bot.infinity_polling()
+# ফাইলের একদম নিচে এই অংশটুকু যোগ করুন
+if __name__ == "__main__":
+    bot.infinity_polling()
+elif __name__ == "bot":
+    bot.infinity_polling()
